@@ -1,77 +1,65 @@
-def generate_vsix_url(vsix_info: str) -> str:
-    """
-    生成VSIX文件的下载URL
+def generate_vscode_extension_url(raw_info: str, platform=None) -> str:
+    """从原始文本生成VS Code扩展下载链接
     
-    参数:
-        vsix_info (str): 包含插件标识符和版本的字符串，格式如下:
-            Identifier
-            publisher.name
-            Version
-            x.x.x
-    
-    返回:
-        str: 生成的VSIX文件下载URL
+    Args:
+        raw_info: 包含identifier和version的原始文本
         
-    异常:
-        ValueError: 当输入格式不正确时抛出
-    
-    示例:
-        >>> vsix_info = '''
-        ... Identifier
-        ... ms-python.python
-        ... Version
-        ... 2025.0.0
-        ... '''
-        >>> generate_vsix_url(vsix_info)
-        'https://marketplace.visualstudio.com/_apis/public/gallery/publishers/ms-python/vsextensions/python/2025.0.0/vspackage'
-    """
-    
-    if not vsix_info or not isinstance(vsix_info, str):
-        raise ValueError("输入必须是非空字符串")
-
-    # 扩展市场的基本URL
-    extension_gallery_url = "https://marketplace.visualstudio.com/_apis/public/gallery"
-    
-    # 解析vsix_info
-    lines = [line.strip() for line in vsix_info.strip().split('\n') if line.strip()]
-    
-    if len(lines) < 4:
-        raise ValueError("输入格式不正确，需要包含Identifier和Version信息")
+    Returns:
+        下载URL
         
+    Raises:
+        ValueError: 当标识符格式错误或输入数据格式错误时
+    """
+    # 解析输入文本
+    info_dict = dict(
+        zip(
+            map(str.lower, raw_info.strip().split('\n')[::2]),
+            raw_info.strip().split('\n')[1::2]
+        )
+    )
+    
+    # 解析标识符
     try:
-        identifier_index = lines.index("Identifier")
-        version_index = lines.index("Version")
-        identifier = lines[identifier_index + 1]
-        version = lines[version_index + 1]
-    except (ValueError, IndexError):
-        raise ValueError("无法找到Identifier或Version信息，请检查输入格式")
+        publisher, name = info_dict['identifier'].split('.')
+    except (KeyError, ValueError):
+        raise ValueError("标识符格式错误，应为 'Publisher.Name'")
+    
+    # 获取版本号
+    try:
+        version = info_dict['version']
+    except KeyError:
+        raise ValueError("未找到版本号")
+    
+    # 生成下载URL
+    base_url = "https://marketplace.visualstudio.com/_apis/public/gallery"
+    download_url = f"{base_url}/publishers/{publisher}/vsextensions/{name}/{version}/vspackage"
+    
+    # 添加平台信息（如果指定了）
+    # win32-x64: Windows 64-bit
+    # win32-ia32: Windows 32-bit
+    # win32-arm64: Windows ARM64
+    # darwin-x64: macOS Intel
+    # darwin-arm64: macOS Apple Silicon
+    # linux-x64: Linux 64-bit
+    # linux-arm64: Linux ARM64
+    # alpine-x64: Alpine Linux
+    if platform:
+        download_url += f"?targetPlatform={platform}"
 
-    # 提取发布者和插件名称
-    try:
-        publisher, name = identifier.split('.')
-    except ValueError:
-        raise ValueError("插件标识符格式不正确，应为'发布者.插件名称'格式")
-    
-    # 验证版本号格式
-    if not all(part.isdigit() for part in version.split('.')):
-        raise ValueError("版本号格式不正确，应为数字和点号组成")
-    
-    # 生成URL
-    url = f"{extension_gallery_url}/publishers/{publisher}/vsextensions/{name}/{version}/vspackage"
-    return url
+    return download_url
 
-if __name__ == '__main__':
-    # 从VSCode的扩展市场获取插件信息
-    vsix_info = '''
-    Identifier
-    ms-python.python
-    Version
-    2025.0.0
-    '''
-    
+def main():
+    raw_info = """
+Identifier
+ms-vscode.cpptools
+Version
+1.23.6
+"""
     try:
-        # 调用函数并打印生成的URL
-        vsix_url = generate_vsix_url(vsix_info)
-        print(f"生成的VSIX文件下载URL为:\n{vsix_url}")
+        download_url = generate_vscode_extension_url(raw_info, "linux-x64")
+        print(download_url)
     except ValueError as e:
         print(f"错误: {str(e)}")
+
+if __name__ == "__main__":
+    main()
